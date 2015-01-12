@@ -11,9 +11,14 @@
 
 class PMProYapIntegration {
   private static $_single; // Let's make this a singleton.
+  public static $page_id; // Wordpress adminpage id
+  public static $name; // Wordpress adminpage name
+
   function __construct() {
     if (isset(self::$_single)) { return; }
     self::$_single = $this; // Singleton set.
+    self::$page_id = 'pmpro-yap-settings';
+    self::$name = __('YAP-asetukset', 'pmpro-yap');
     $this->init();
   }
 
@@ -89,7 +94,13 @@ class PMProYapIntegration {
    * Add admin page for yap-settings
    */
   public function pmpro_yap_admin() {
-    add_submenu_page('pmpro-membershiplevels', __('YAP-asetukset', 'pmpro'), __('YAP-asetukset', 'pmpro'), 'pmpro_paymentsettings', 'pmpro-yap-settings', array(&$this,'pmpro_yap_settings'));
+    add_submenu_page('pmpro-membershiplevels', self::$name, self::$name, 'pmpro_paymentsettings', self::$page_id, array(&$this,'pmpro_yap_settings'));
+    add_filter( 'pmpro_admin_settings_tabs', array(&$this,'add_pmpro_settings_tab'), 100, 1);
+  }
+
+  public function add_pmpro_settings_tab($settings_tabs) {
+    $settings_tabs[self::$page_id] = self::$name;
+    return $settings_tabs;
   }
 
   /**
@@ -146,7 +157,7 @@ class PMProYapIntegration {
 
     //Return error if settings are not set
     if (!$this->getSoapUrl()) {
-      return new WP_Error('yap_settings_not_set', __('<strong>VIRHE</strong>: Aseta YAP-integraation asetukset ylläpidosta. Tilaajat -> YAP-asetukset','pmpro'));
+      return new WP_Error('yap_settings_not_set', __('<strong>VIRHE</strong>: Aseta YAP-integraation asetukset ylläpidosta. Tilaajat -> YAP-asetukset','pmpro-yap'));
     }
     $client = new SoapClient($this->getSoapUrl(), array('connection_timeout' => 600,'trace' => 1));
 
