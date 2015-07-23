@@ -40,7 +40,6 @@ class PMProYapIntegration {
 
     // Redirect subscribers away from wp-admin to home
     add_action( 'admin_init', array(&$this,'redirect_non_admin_users'));
-    add_filter( 'show_admin_bar' , array(&$this,'hide_admin_bar_non_admin_users'));
   }
 
   /**
@@ -72,19 +71,8 @@ class PMProYapIntegration {
    *
    * This function is attached to the 'admin_init' action hook.
    */
-  public static function hide_admin_bar_non_admin_users() {
-    if ( ! current_user_can('manage_options') ) {
-      return false;
-    }
-  }
-
-  /**
-   * Redirect non-admin users to home page
-   *
-   * This function is attached to the 'admin_init' action hook.
-   */
   public static function redirect_non_admin_users() {
-    if ( ! current_user_can( 'manage_options' ) && '/wp-admin/admin-ajax.php' != $_SERVER['PHP_SELF'] ) {
+    if ( !current_user_can('edit_posts') && !( defined( 'DOING_AJAX' ) && DOING_AJAX ) ) {
       wp_redirect( home_url() );
       exit;
     }
@@ -126,7 +114,7 @@ class PMProYapIntegration {
       $users = new WP_User_Query( array(
         'meta_query' => array(
           'relation' => 'AND',
-          array(
+          array(  
             'key'     => 'first_name',
             'value'   => $first_name,
             'compare' => 'LIKE'
@@ -182,10 +170,16 @@ class PMProYapIntegration {
     $params->userId = $username;
     $params->password = $password;
 
+    //Logfile
+    $logfile = dirname(ini_get('error_log')).'/yap-debug.log';
+
     try {
-      //Ask user from yap and save it
+      // Ask user from yap and save it
+      PMProYapIntegration::log('Requested from YAP',$params);
       $result = $client->LoginAndGetMagazineSubscriperDetails($params)->LoginAndGetMagazineSubscriperDetailsResult;
+      PMProYapIntegration::log('YAP returned',$result);
     } catch(SoapFault $e) {
+      PMProYapIntegration::log("YAP returned Soap error",array('faultstring' => $e->faultstring,'faultcode' => $e->faultcode, 'faultactor' => $e->faultactor));
       if (strpos($e->faultstring,'<faultstring>Login error</faultstring>') !== false) {
         //Change subscription status to none
         pmpro_changeMembershipLevel(NULL,$old_user->ID);
@@ -205,12 +199,10 @@ class PMProYapIntegration {
       )
     ));
 
-    error_log("users found with:".$result->PersonId." :".print_r($user,true));
     if (!empty($user)) {
 
       //PersonId was found
       $user_id = $user->ID;
-      error_log("UsedID:".$user_id);
       //User was in the records but password was wrong
       wp_set_password($password,$user_id);
 
@@ -218,12 +210,10 @@ class PMProYapIntegration {
 
       //Email was found
       $user = get_user_by('email', $result->Email );
-      error_log("User by email:".$user);
 
       wp_set_password($password,$user->ID);
 
     } else {
-      error_log("Creating new user");
       //Create new user
       $new_username = $this->createUsername($result);
       if (empty($result->Email)) {
@@ -308,6 +298,12 @@ class PMProYapIntegration {
     return mb_convert_case($str, MB_CASE_TITLE, "UTF-8");
   }
 
+  public static function log($message,$object) {
+    $logfile = dirname(ini_get('error_log')).'/yap-debug.log';
+    error_log(date('m/d/Y @ g:i:sA',time()).': '.$message.':',3,$logfile);
+    error_log(print_r($object,true),3,$logfile);
+  }
+
 }
 
 $yapApi = new PMProYapIntegration();
@@ -326,8 +322,6 @@ if ( !function_exists('wp_authenticate') ) :
   * @return WP_User|WP_Error WP_User object if login successful, otherwise WP_Error object.
   */
  function wp_authenticate($username, $password) {
-  error_log("START LOGIN with USER:{$username} PASSWORD:{$password}");
-   $username = sanitize_user($username);
    $password = trim($password);
 
    /**
@@ -352,7 +346,6 @@ if ( !function_exists('wp_authenticate') ) :
      return $user;
    }
 
-   error_log('$user after normal login:'.print_r($user,true));
 
    $yapApi = PMProYapIntegration::getSingleton();
 
@@ -360,19 +353,16 @@ if ( !function_exists('wp_authenticate') ) :
    if (is_wp_error($user) || $user == null) {
     $user = $yapApi->login_with_real_name($username,$password);
    }
-   error_log('$user after firstname+lastname login:'.print_r($user,true));
 
    
-   error_log('$user was created by yap:'.print_r($yapApi->userWasCreatedByYap($user),true));
    //If User wasn't authenticated from wordpress try to login through yap
    if ( is_wp_error($user) || $user == null ) {
-    error_log('$user was created by yap:'.print_r($yapApi->userWasCreatedByYap($user),true));
+    error_log("Try to Create user with YAP USER:{$username} PASSWORD:{$password}");
     $user = $yapApi->create_or_update_user_if_found($username,$password);
    } elseif ($yapApi->userWasCreatedByYap($user)) {
     //User was already identified. Check if the subscription is still going.
     $user = $yapApi->create_or_update_user_if_found($username,$password,$user);
    }
-   error_log('$user after yap login:'.print_r($user,true));
 
    if (is_wp_error($user)) {
      /**
