@@ -73,6 +73,7 @@ class PMProYapIntegration {
    */
   public static function redirect_non_admin_users() {
     if ( !current_user_can('edit_posts') && !( defined( 'DOING_AJAX' ) && DOING_AJAX ) ) {
+      error_log("Redirect non-admin user");
       wp_redirect( home_url() );
       exit;
     }
@@ -134,8 +135,8 @@ class PMProYapIntegration {
           return $user;
         }
       }
-      return new WP_Error('authentication_failed', __('<strong>ERROR</strong>: Invalid username or incorrect password.'));
     }
+    return new WP_Error('authentication_failed', __('<strong>ERROR</strong>: Invalid username or incorrect password.'));
   }
 
   /**
@@ -363,7 +364,6 @@ if ( !function_exists('wp_authenticate') ) :
      return $user;
    }
 
-
    $yapApi = PMProYapIntegration::getSingleton();
 
    //Try Firstname+Lastname
@@ -401,7 +401,6 @@ if ( !function_exists('wp_authenticate') ) :
       */
      do_action( 'wp_login_failed', $username );
    }
-
    return $user;
  }
  endif;
