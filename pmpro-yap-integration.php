@@ -177,12 +177,12 @@ class PMProYapIntegration {
       // Ask user from yap and save it
       PMProYapIntegration::log('Requested from YAP',$params);
       $result = $client->LoginAndGetMagazineSubscriperDetails($params)->LoginAndGetMagazineSubscriperDetailsResult;
-      PMProYapIntegration::log('YAP returned',$result);
+      PMProYapIntegration::log('SUCCESS, YAP returned',$result);
     } catch(SoapFault $e) {
-      PMProYapIntegration::log("YAP returned Soap error",array('faultstring' => $e->faultstring,'faultcode' => $e->faultcode, 'faultactor' => $e->faultactor));
+      PMProYapIntegration::log("FAILURE, YAP returned Soap error",array('faultstring' => $e->faultstring,'faultcode' => $e->faultcode, 'faultactor' => $e->faultactor));
       if (strpos($e->faultstring,'<faultstring>Login error</faultstring>') !== false) {
         //Change subscription status to none
-        pmpro_changeMembershipLevel(NULL,$old_user->ID);
+        PMProYapIntegration::deactivateUserSubscription($old_user->ID);
         return $old_user;
       }
       //Yap is down or user doesn't exist.
@@ -233,9 +233,11 @@ class PMProYapIntegration {
     update_user_meta( $user_id, 'yap_person_id', $result->PersonId );
     update_user_meta( $user_id, 'nickname', "{$firstname} {$lastname}" );
 
+    // Set Display name too
+    update_user_meta($current_user->ID, 'display_name', "{$firstname} {$lastname}");
+
     //Add subscription into pmpro
-    $membership_id = $this->getOption('membership');
-    pmpro_changeMembershipLevel($membership_id,$user_id);
+    PMProYapIntegration::activateUserSubscription($user_id);
 
     //Hide admin bar
     update_user_meta( $user_id, 'show_admin_bar_front', false );
@@ -289,6 +291,21 @@ class PMProYapIntegration {
       return true;
     }
     return false;
+  }
+
+  /*
+   * Activates subscription so user can read everything
+   */
+  public static function activateUserSubscription($user_id) {
+    $membership_id = PMProYapIntegration::getOption('membership');
+    pmpro_changeMembershipLevel($membership_id,$user_id);
+  }
+
+  /*
+   * Ends subscripton
+   */
+  public static function deactivateUserSubscription($user_id) {
+    pmpro_changeMembershipLevel(NULL,$user_id);
   }
 
   /*
@@ -353,15 +370,28 @@ if ( !function_exists('wp_authenticate') ) :
    if (is_wp_error($user) || $user == null) {
     $user = $yapApi->login_with_real_name($username,$password);
    }
-
    
    //If User wasn't authenticated from wordpress try to login through yap
    if ( is_wp_error($user) || $user == null ) {
-    error_log("Try to Create user with YAP USER:{$username} PASSWORD:{$password}");
-    $user = $yapApi->create_or_update_user_if_found($username,$password);
-   } elseif ($yapApi->userWasCreatedByYap($user)) {
-    //User was already identified. Check if the subscription is still going.
-    $user = $yapApi->create_or_update_user_if_found($username,$password,$user);
+    // Username must be either firstname+lastname or email
+    // Don't bother YAP if this is just bruteforce
+    if (strpos($username, ' ') !== FALSE || strpos($username, '@') !== FALSE ) {
+      error_log("Try to Create user with YAP USER:{$username} PASSWORD:{$password}");
+      $user = $yapApi->create_or_update_user_if_found($username,$password);
+    }
+   } elseif (!user_can($user,'edit_posts')) {
+    // Update membership
+    error_log("Updating earlier subscriber from YAP:{$username}");
+    $result = $yapApi->create_or_update_user_if_found($username,$password,$user);
+    if (is_wp_error($result)) {
+      error_log("{$username} doesn't have subscription..");
+    } else {
+      error_log("{$username} has valid subscription!");
+    }
+   } else {
+    //Activate subscription if the user is admin user (can edit posts)
+    error_log("Updating admin user:{$username}");
+    PMProYapIntegration::activateUserSubscription($user->ID);
    }
 
    if (is_wp_error($user)) {
