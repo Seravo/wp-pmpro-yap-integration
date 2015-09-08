@@ -45,9 +45,9 @@ class PMProYapIntegration {
   /**
    * Show actions in user edit mode.
    */
-  public function extra_user_profile_fields($user) {
+  public function extra_user_profile_fields($user_id) {
     //only admins can see this
-    if ( !current_user_can( 'edit_user', $user_id ) ) { return false; }
+    if ( !isset($user_id) ||  !user_can($user_id, 'edit_user' ) ) { return false; }
 
     require_once(dirname(__FILE__) . "/includes/user-address-fields.php");
   }
@@ -59,7 +59,7 @@ class PMProYapIntegration {
    */
   public function save_extra_user_profile_fields( $user_id ) {
 
-    if ( !current_user_can( 'edit_user', $user_id ) ) { return false; }
+    if ( !isset($user_id) || !user_can($user_id, 'edit_user' ) ) { return false; }
 
     update_user_meta( $user_id, 'address', $_POST['address'] );
     update_user_meta( $user_id, 'city', $_POST['city'] );
@@ -188,6 +188,11 @@ class PMProYapIntegration {
       }
       //Yap is down or user doesn't exist.
       return new WP_Error('authentication_failed', __('<strong>ERROR</strong>: Invalid username or incorrect password.'));
+    }
+
+    // Check if subscription is still valid
+    if (!self::is_subscription_valid($result)) {
+      return new WP_Error('subscription_not_valid', __('<strong>ERROR</strong>: Your subscription has ended.'));
     }
 
     //Check if user exists but the password has just changed
@@ -320,6 +325,28 @@ class PMProYapIntegration {
     $logfile = dirname(ini_get('error_log')).'/yap-debug.log';
     error_log(date('m/d/Y @ g:i:sA',time()).': '.$message.':',3,$logfile);
     error_log(print_r($object,true),3,$logfile);
+  }
+
+  /**
+   * Check if subscription is still valid
+   *
+   * @param $response - soap response from yap
+   *
+   * @return bool
+   */
+  public static function is_subscription_valid($response){
+    foreach ($result->Subscriptions->Subscription as $subscription) {
+      $date = date_parse_from_format('Y.n.j', $subscription->endDate);
+      $timestamp = @mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
+      // Add one day so that subscription will end when the last day is finished
+      $timestamp = @strtotime('+1 days', $timestamp);
+
+      // Check if the subscription is still valid
+      if($timestamp > time()) {
+        return true;
+      }
+    }
+    return false;
   }
 
 }
