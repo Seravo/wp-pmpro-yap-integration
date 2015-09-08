@@ -190,11 +190,6 @@ class PMProYapIntegration {
       return new WP_Error('authentication_failed', __('<strong>ERROR</strong>: Invalid username or incorrect password.'));
     }
 
-    // Check if subscription is still valid
-    if (!self::is_subscription_valid($result)) {
-      return new WP_Error('subscription_not_valid', __('<strong>ERROR</strong>: Your subscription has ended.'));
-    }
-
     //Check if user exists but the password has just changed
     $user = reset(get_users(
       array(
@@ -242,8 +237,12 @@ class PMProYapIntegration {
     // Set Display name too
     update_user_meta($current_user->ID, 'display_name', "{$firstname} {$lastname}");
 
-    //Add subscription into pmpro
-    PMProYapIntegration::activateUserSubscription($user_id);
+    //Add subscription into pmpro if it is still valid in yap
+    if (self::is_subscription_valid($result)) {
+      PMProYapIntegration::activateUserSubscription($user_id);
+    } else {
+      PMProYapIntegration::deactivateUserSubscription($user_id);
+    }
 
     //Hide admin bar
     update_user_meta( $user_id, 'show_admin_bar_front', false );
