@@ -3,7 +3,7 @@
  * Plugin Name: PMPro YAP Integration
  * Plugin URI: 
  * Description: Integrate YAP with Paid Memberships Pro
- * Version: 0.1
+ * Version: 0.2
  * Author: Seravo / Onni Hakala
  * Author URI: http://seravo.fi
  * License: GPLv2
@@ -334,6 +334,9 @@ class PMProYapIntegration {
    * @return bool
    */
   public static function is_subscription_valid($response){
+    // Check that the object has correct information set
+    if ( isset($result) || isset($result->Subscriptions) || isset($result->Subscriptions->Subscription) ) { return false; }
+    
     foreach ($result->Subscriptions->Subscription as $subscription) {
       $date = date_parse_from_format('Y.n.j', $subscription->endDate);
       $timestamp = @mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
