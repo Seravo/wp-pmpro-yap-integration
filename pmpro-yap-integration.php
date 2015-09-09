@@ -254,8 +254,10 @@ class PMProYapIntegration {
 
     //Add subscription into pmpro if it is still valid in yap
     if (self::is_subscription_valid($result)) {
+      error_log('returned true from is_subscription_valid');
       PMProYapIntegration::activateUserSubscription($user_id);
     } else {
+      error_log('returned false from is_subscription_valid');
       PMProYapIntegration::deactivateUserSubscription($user_id);
     }
 
@@ -355,21 +357,29 @@ class PMProYapIntegration {
     // Check that the object has correct information set
     if ( ! isset($result) || ! isset($result->Subscriptions) || ! isset($result->Subscriptions->Subscription) ) { return false; }
 
+    // collect all end dates
+    $endDates = array();
     foreach ($result->Subscriptions->Subscription as $subscription) {
-      $date = date_parse_from_format('Y-m-d', $subscription->endDate);
-
-      $timestamp = mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
-      // Add one day so that subscription will end when the last day is finished
-      $timestamp = strtotime('+1 days', $timestamp);
-
-      // Check if the subscription is still valid
-      if($timestamp > time()) {
-        PMProYapIntegration::log('Subscription is valid. End ts', $timestamp);
-        return true;
-      }
+      array_push($endDates, $subscription->endDate);
     }
-    PMProYapIntegration::log('Subscription might be expired. End ts', $timestamp);
-    return false;
+
+    // sort so that last end date is at index 0
+    rsort($endDates);
+
+    $date = date_parse_from_format('Y-m-d', $endDates[0]);
+
+    $timestamp = mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
+    // Add one day so that subscription will end when the last day is finished
+    $timestamp = strtotime('+1 days', $timestamp);
+
+    // Check if the subscription is still valid
+    if ($timestamp > time()) {
+      PMProYapIntegration::log('Subscription is valid. End ts', $timestamp);
+      return true;
+    } else {
+      PMProYapIntegration::log('Subscription might be expired. End ts', $timestamp);
+      return false;
+    }
   }
 
 }
