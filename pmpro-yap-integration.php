@@ -104,6 +104,7 @@ class PMProYapIntegration {
    */
 
   public function login_with_real_name($username,$password) {
+
     // Split firstname+lastname from username
     // This way user can use real name in wordpress login
     $names = explode(' ',$username);
@@ -211,6 +212,7 @@ class PMProYapIntegration {
 
       //Email was found
       $user = get_user_by('email', $result->Email );
+      $user_id = $user->ID;
 
       wp_set_password($password,$user->ID);
 
@@ -303,6 +305,8 @@ class PMProYapIntegration {
    */
   public static function activateUserSubscription($user_id) {
     $membership_id = PMProYapIntegration::getOption('membership');
+    PMProYapIntegration::log('Activate subscription for user_id', $user_id);
+    PMProYapIntegration::log('Using membership_id', $membership_id);
     pmpro_changeMembershipLevel($membership_id,$user_id);
   }
 
@@ -310,6 +314,7 @@ class PMProYapIntegration {
    * Ends subscripton
    */
   public static function deactivateUserSubscription($user_id) {
+    PMProYapIntegration::log('Deactivate subscription for user_id', $user_id);
     pmpro_changeMembershipLevel(NULL,$user_id);
   }
 
@@ -323,7 +328,7 @@ class PMProYapIntegration {
   public static function log($message,$object) {
     $logfile = dirname(ini_get('error_log')).'/yap-debug.log';
     error_log(date('m/d/Y @ g:i:sA',time()).': '.$message.':',3,$logfile);
-    error_log(print_r($object,true),3,$logfile);
+    error_log(print_r($object,true)."\n",3,$logfile);
   }
 
   /**
@@ -333,21 +338,24 @@ class PMProYapIntegration {
    *
    * @return bool
    */
-  public static function is_subscription_valid($response){
+  public static function is_subscription_valid($result){
     // Check that the object has correct information set
-    if ( isset($result) || isset($result->Subscriptions) || isset($result->Subscriptions->Subscription) ) { return false; }
-    
+    if ( ! isset($result) || ! isset($result->Subscriptions) || ! isset($result->Subscriptions->Subscription) ) { return false; }
+
     foreach ($result->Subscriptions->Subscription as $subscription) {
-      $date = date_parse_from_format('Y.n.j', $subscription->endDate);
-      $timestamp = @mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
+      $date = date_parse_from_format('Y-m-d', $subscription->endDate);
+
+      $timestamp = mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
       // Add one day so that subscription will end when the last day is finished
-      $timestamp = @strtotime('+1 days', $timestamp);
+      $timestamp = strtotime('+1 days', $timestamp);
 
       // Check if the subscription is still valid
       if($timestamp > time()) {
+        PMProYapIntegration::log('Subscription is valid. End ts', $timestamp);
         return true;
       }
     }
+    PMProYapIntegration::log('Subscription might be expired. End ts', $timestamp);
     return false;
   }
 
