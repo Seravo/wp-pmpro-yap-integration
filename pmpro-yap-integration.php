@@ -39,6 +39,7 @@ class PMProYapIntegration {
     add_action( 'edit_user_profile_update', array(&$this,'save_extra_user_profile_fields') );
 
     // Redirect subscribers away from wp-admin to home
+    // This fires on every login and redirects users from /wp-admin to the front page
     add_action( 'admin_init', array(&$this,'redirect_non_admin_users'));
   }
 
@@ -377,6 +378,7 @@ if ( !function_exists('wp_authenticate') ) :
   * @return WP_User|WP_Error WP_User object if login successful, otherwise WP_Error object.
   */
  function wp_authenticate($username, $password) {
+   $username = trim($username);
    $password = trim($password);
 
    /**
@@ -403,12 +405,12 @@ if ( !function_exists('wp_authenticate') ) :
 
    $yapApi = PMProYapIntegration::getSingleton();
 
-   //Try Firstname+Lastname
+   // Try Firstname and Lastname from WordPress (with function from YAP library)
    if (is_wp_error($user) || $user == null) {
     $user = $yapApi->login_with_real_name($username,$password);
    }
-   
-   //If User wasn't authenticated from wordpress try to login through yap
+
+   // If user wasn't authenticated from WordPress, try to login through YAP
    if ( is_wp_error($user) || $user == null ) {
     // Username must be either firstname+lastname or email
     // Don't bother YAP if this is just bruteforce
@@ -419,8 +421,8 @@ if ( !function_exists('wp_authenticate') ) :
    } elseif (!user_can($user,'edit_posts')) {
     // Update membership
     error_log("Updating earlier subscriber from YAP:{$username}");
-    $result = $yapApi->create_or_update_user_if_found($username,$password,$user);
-    if (is_wp_error($result)) {
+    $user = $yapApi->create_or_update_user_if_found($username,$password,$user);
+    if (is_wp_error($user)) {
       error_log("{$username} doesn't have subscription..");
     } else {
       error_log("{$username} has valid subscription!");
