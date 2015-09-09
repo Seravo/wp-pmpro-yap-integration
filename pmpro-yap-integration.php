@@ -42,7 +42,7 @@ class PMProYapIntegration {
     // This fires on every login and redirects users from /wp-admin to the front page
     add_action( 'admin_init', array(&$this,'redirect_non_admin_users'));
 
-    function pmpro_yap_login_help_text($input) {
+    function pmpro_yap_login_help_text() {
       return '
       <p>Kirjaudu verkkolehteen samalla sähköposti ja salasanaparilla kuin
       <a href="https://secure.yap.fi/Le-eAsiointi/Maaselka/">lehden
@@ -357,7 +357,15 @@ class PMProYapIntegration {
     // Check that the object has correct information set
     if ( ! isset($result) || ! isset($result->Subscriptions) || ! isset($result->Subscriptions->Subscription) ) { return false; }
 
-    $date = date_parse_from_format('Y-m-d', $result->Subscriptions->Subscription[0]->endDate);
+    error_log('otto: '. print_r(gettype($result->Subscriptions->Subscription), true));
+
+    if (gettype($result->Subscriptions->Subscription) == 'array') {
+      $endDate = $result->Subscriptions->Subscription[0]->endDate;
+    } else {
+      $endDate = $result->Subscriptions->Subscription->endDate;
+    }
+    error_log('otto: '. print_r($endDate, true));
+    $date = date_parse_from_format('Y-m-d', $endDate);
 
     $timestamp = mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
     // Add one day so that subscription will end when the last day is finished
