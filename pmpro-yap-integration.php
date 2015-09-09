@@ -53,6 +53,19 @@ class PMProYapIntegration {
     }
     add_filter( 'login_message', 'pmpro_yap_login_help_text' );
 
+    function pmpro_yap_non_member_text() {
+      // use hard coded value '1' as calling instance from this context does not work
+      //$membership_id = PMProYapIntegration::getOption('membership');
+      if (is_user_logged_in() === true && pmpro_has_membership_access() === false) {
+        echo '<div id="tilausstatus" class="user_login"
+              style="width: 100%; position: absolute; top: 0px; left; 0px;">
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;<a href="/maaselka/tilaukset/">
+              <strong>Lukuoikeutesi on päättynyt. Tilaa lisää lukuoikeutta.</strong>
+              </a></p></div>';
+      }
+    }
+    add_filter( 'wp_footer', 'pmpro_yap_non_member_text' );
+
   }
 
   /**
