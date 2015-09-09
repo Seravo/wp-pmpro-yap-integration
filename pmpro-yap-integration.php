@@ -41,6 +41,18 @@ class PMProYapIntegration {
     // Redirect subscribers away from wp-admin to home
     // This fires on every login and redirects users from /wp-admin to the front page
     add_action( 'admin_init', array(&$this,'redirect_non_admin_users'));
+
+    function pmpro_yap_login_help_text($input) {
+      return '
+      <p>Kirjaudu verkkolehteen samalla sähköposti ja salasanaparilla kuin
+      <a href="https://secure.yap.fi/Le-eAsiointi/Maaselka/">lehden
+      tilaajapalveluun</a>.</p><br>
+      <p>Vaihtoehtoisesti voit kirjautua antamalla käytättäjätunnuksena
+      oman nimesi (muodossa Etunimi Sukunim) ja salasanana tilaajanumerosi.</p><br>
+      ';
+    }
+    add_filter( 'login_message', 'pmpro_yap_login_help_text' );
+
   }
 
   /**
