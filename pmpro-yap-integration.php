@@ -357,16 +357,7 @@ class PMProYapIntegration {
     // Check that the object has correct information set
     if ( ! isset($result) || ! isset($result->Subscriptions) || ! isset($result->Subscriptions->Subscription) ) { return false; }
 
-    // collect all end dates
-    $endDates = array();
-    foreach ($result->Subscriptions->Subscription as $subscription) {
-      array_push($endDates, $subscription->endDate);
-    }
-
-    // sort so that last end date is at index 0
-    rsort($endDates);
-
-    $date = date_parse_from_format('Y-m-d', $endDates[0]);
+    $date = date_parse_from_format('Y-m-d', $result->Subscriptions->Subscription[0]->endDate);
 
     $timestamp = mktime(0, 0, 0, $date['month'], $date['day'], $date['year']);
     // Add one day so that subscription will end when the last day is finished
